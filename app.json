@@ -1,0 +1,76 @@
+{
+  "expo": {
+    "name": "Spotlit",
+    "slug": "spotlit",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#4A2506"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.spotlit.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Spotlit needs camera access to photograph your vitiligo patches and track their recovery over time.",
+        "NSPhotoLibraryUsageDescription": "Spotlit needs photo library access to save and retrieve patch photos for your timelapse.",
+        "NSMicrophoneUsageDescription": "Microphone access is needed for video capture."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#4A2506"
+      },
+      "package": "com.spotlit.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Spotlit needs camera access to photograph your vitiligo patches."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Spotlit needs access to your photo library for patch photos."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Spotlit needs access to save your timelapse to your photo library.",
+          "savePhotosPermission": "Spotlit needs permission to save timelapse videos."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#4A2506"
+        }
+      ]
+    ],
+    "scheme": "spotlit",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
