@@ -38,6 +38,19 @@ export function formatTime(timeStr: string): string {
   return `${hour}:${String(m).padStart(2, '0')} ${period}`;
 }
 
+export function formatRelativeTime(isoTimestamp: string): string {
+  const then = new Date(isoTimestamp).getTime();
+  const diffMs = Date.now() - then;
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(isoTimestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 export function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }

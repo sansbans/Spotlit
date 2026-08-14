@@ -1,5 +1,7 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '@/context/AuthContext';
+import { useConsent } from '@/context/ConsentContext';
 import { Colors, Typography } from '@/constants/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -17,6 +19,13 @@ function TabIcon({
 }
 
 export default function TabLayout() {
+  const { session, loading: authLoading } = useAuth();
+  const { researchOptIn, loading: consentLoading } = useConsent();
+
+  if (authLoading || (session && consentLoading)) return null;
+  if (!session) return <Redirect href="/(auth)/sign-in" />;
+  if (researchOptIn === null) return <Redirect href="/consent" />;
+
   return (
     <Tabs
       screenOptions={{
@@ -62,6 +71,15 @@ export default function TabLayout() {
           title: 'Timelapse',
           tabBarIcon: ({ focused, color }) => (
             <TabIcon name="film" focused={focused} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="community"
+        options={{
+          title: 'Community',
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="people" focused={focused} color={color} />
           ),
         }}
       />
