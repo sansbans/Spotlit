@@ -1,7 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Patch, DailyLog, PatchWithStats } from '../types';
-import * as storage from '../utils/storage';
-import { computeStats, todayString, generateId, getDayNumber } from '../utils/dates';
+import * as storage from '../utils/supabaseStorage';
+import { computeStats, getDayNumber } from '../utils/dates';
+import { useAuth } from './AuthContext';
 
 interface PatchContextValue {
   patches: PatchWithStats[];
@@ -19,12 +20,20 @@ interface PatchContextValue {
 const PatchContext = createContext<PatchContextValue | null>(null);
 
 export function PatchProvider({ children }: { children: React.ReactNode }) {
+  const { session } = useAuth();
+  const userId = session?.user.id ?? null;
   const [patches, setPatches] = useState<PatchWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const mounted = useRef(true);
 
   const load = useCallback(async () => {
-    const rawPatches = await storage.getPatches();
+    if (!userId) {
+      setPatches([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const rawPatches = await storage.getPatches(userId);
     const patchesWithStats: PatchWithStats[] = await Promise.all(
       rawPatches.map(async (p) => {
         const logs = await storage.getLogs(p.id);
@@ -36,64 +45,71 @@ export function PatchProvider({ children }: { children: React.ReactNode }) {
       setPatches(patchesWithStats);
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
+    mounted.current = true;
     load();
     return () => {
       mounted.current = false;
     };
   }, [load]);
 
-  const addPatch = useCallback(async (data: Omit<Patch, 'id' | 'createdAt'>): Promise<string> => {
-    const patch: Patch = {
-      ...data,
-      id: generateId(),
-      createdAt: new Date().toISOString(),
-    };
-    await storage.savePatch(patch);
-    await load();
-    return patch.id;
-  }, [load]);
+  const addPatch = useCallback(
+    async (data: Omit<Patch, 'id' | 'createdAt'>): Promise<string> => {
+      if (!userId) throw new Error('Must be signed in to add a patch');
+      const patch = await storage.insertPatch(userId, data);
+      await load();
+      return patch.id;
+    },
+    [userId, load]
+  );
 
-  const updatePatch = useCallback(async (id: string, updates: Partial<Patch>): Promise<void> => {
-    const patch = patches.find((p) => p.id === id);
-    if (!patch) return;
-    const updated: Patch = { ...patch, ...updates };
-    await storage.savePatch(updated);
-    await load();
-  }, [patches, load]);
+  const updatePatch = useCallback(
+    async (id: string, updates: Partial<Patch>): Promise<void> => {
+      if (!userId) return;
+      await storage.updatePatch(userId, id, updates);
+      await load();
+    },
+    [userId, load]
+  );
 
-  const deletePatch = useCallback(async (id: string): Promise<void> => {
-    await storage.deletePatch(id);
-    await load();
-  }, [load]);
+  const deletePatch = useCallback(
+    async (id: string): Promise<void> => {
+      await storage.deletePatch(id);
+      await load();
+    },
+    [load]
+  );
 
-  const addLog = useCallback(async (
-    data: Omit<DailyLog, 'id' | 'createdAt' | 'dayNumber'>
-  ): Promise<void> => {
-    const patch = patches.find((p) => p.id === data.patchId);
-    if (!patch) return;
-    const dayNumber = getDayNumber(patch.startDate, data.date);
-    const log: DailyLog = {
-      ...data,
-      id: generateId(),
-      dayNumber,
-      createdAt: new Date().toISOString(),
-    };
-    await storage.saveLog(log);
-    await load();
-  }, [patches, load]);
+  const addLog = useCallback(
+    async (data: Omit<DailyLog, 'id' | 'createdAt' | 'dayNumber'>): Promise<void> => {
+      if (!userId) return;
+      const patch = patches.find((p) => p.id === data.patchId);
+      if (!patch) return;
+      const dayNumber = getDayNumber(patch.startDate, data.date);
+      await storage.insertLog(userId, { ...data, dayNumber });
+      await load();
+    },
+    [userId, patches, load]
+  );
 
-  const updateLog = useCallback(async (log: DailyLog): Promise<void> => {
-    await storage.saveLog(log);
-    await load();
-  }, [load]);
+  const updateLog = useCallback(
+    async (log: DailyLog): Promise<void> => {
+      if (!userId) return;
+      await storage.updateLog(userId, log);
+      await load();
+    },
+    [userId, load]
+  );
 
-  const deleteLog = useCallback(async (patchId: string, logId: string): Promise<void> => {
-    await storage.deleteLog(patchId, logId);
-    await load();
-  }, [load]);
+  const deleteLog = useCallback(
+    async (patchId: string, logId: string): Promise<void> => {
+      await storage.deleteLog(patchId, logId);
+      await load();
+    },
+    [load]
+  );
 
   const getPatchById = useCallback(
     (id: string) => patches.find((p) => p.id === id),

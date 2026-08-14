@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -8,33 +9,65 @@ import {
   Text,
   View,
 } from 'react-native';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { usePatches } from '@/context/PatchContext';
+import { useAuth } from '@/context/AuthContext';
+import { useConsent } from '@/context/ConsentContext';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '@/constants/theme';
-import * as storage from '@/utils/storage';
+import * as storage from '@/utils/supabaseStorage';
 
 export default function SettingsScreen() {
   const { patches, refresh } = usePatches();
+  const { session, profile, signOut } = useAuth();
+  const { researchOptIn, loading: consentLoading, setResearchOptIn } = useConsent();
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   const [reminderTime, setReminderTime] = useState('20:00');
+  const [consentSaving, setConsentSaving] = useState(false);
 
   const handleClearData = () => {
     Alert.alert(
       'Clear All Data',
-      'This will permanently delete all your patches and logs. This cannot be undone.',
+      'This will permanently delete all your patches and logs from Spotlit. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Clear Everything',
           style: 'destructive',
           onPress: async () => {
-            await storage.clearAllData();
+            if (!session) return;
+            await storage.clearAllData(session.user.id);
             await refresh();
             Alert.alert('Done', 'All data has been cleared.');
           },
         },
       ]
     );
+  };
+
+  const handleToggleResearch = async (value: boolean) => {
+    setConsentSaving(true);
+    try {
+      await setResearchOptIn(value);
+    } catch {
+      Alert.alert('Error', 'Could not update your research sharing preference. Please try again.');
+    } finally {
+      setConsentSaving(false);
+    }
+  };
+
+  const handleSignOut = () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          await signOut();
+          router.replace('/(auth)/sign-in');
+        },
+      },
+    ]);
   };
 
   const stats = {
@@ -58,6 +91,51 @@ export default function SettingsScreen() {
         <Text style={styles.appTagline}>Track. Log. Recover.</Text>
         <Text style={styles.appVersion}>Version 1.0.0</Text>
       </View>
+
+      {/* Account */}
+      <SectionHeader title="Account" />
+      <SettingsCard>
+        <SettingsRow
+          icon="person-circle-outline"
+          label={profile?.displayName ?? 'Loading…'}
+          right={<Text style={styles.settingValue}>{session?.user.email}</Text>}
+        />
+        <SettingsRow
+          icon="log-out-outline"
+          label="Sign Out"
+          labelStyle={{ color: Colors.error }}
+          iconColor={Colors.error}
+          onPress={handleSignOut}
+        />
+      </SettingsCard>
+
+      {/* Research data sharing */}
+      <SectionHeader title="Research Data Sharing" />
+      <SettingsCard>
+        <View style={styles.infoBlock}>
+          <Text style={styles.infoText}>
+            Share de-identified tracking data (body location, trigger, medication, and
+            day-to-day progress — never your name, photos, or notes) to help vitiligo
+            researchers. Off by default, and reversible anytime.
+          </Text>
+        </View>
+        <SettingsRow
+          icon="flask-outline"
+          label="Share data for research"
+          right={
+            consentLoading || consentSaving ? (
+              <ActivityIndicator size="small" color={Colors.primary} />
+            ) : (
+              <Switch
+                value={!!researchOptIn}
+                onValueChange={handleToggleResearch}
+                trackColor={{ true: Colors.primary, false: Colors.borderLight }}
+                thumbColor="#FFF"
+              />
+            )
+          }
+        />
+      </SettingsCard>
 
       {/* Stats summary */}
       <SectionHeader title="Your Journey" />
